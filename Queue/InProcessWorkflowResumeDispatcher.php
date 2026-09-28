@@ -41,6 +41,9 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
      * @param \Closure(): (callable(ResumeWorkflowMessage): mixed)     $resume   the resume handler, resolved late: it takes this dispatcher
      * @param \Closure(): (callable(ActivityMessage): mixed)           $activity the activity processor, resolved late for the same reason
      * @param \Closure(): (callable(FireWorkflowTimersMessage): mixed) $fire     the timer handler, likewise
+     * @param (\Closure(): float)|null                                 $now      the clock the activity transport stamps
+     *                                                                           its due times with (`durable.clock`, #617);
+     *                                                                           the wall clock by default
      */
     public function __construct(
         private readonly WorkflowMetadataStore $metadata,
@@ -49,6 +52,7 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
         private readonly \Closure $activity,
         private readonly \Closure $fire,
         private readonly float $budgetSeconds = 10.0,
+        private readonly ?\Closure $now = null,
     ) {}
 
     public function dispatchResume(string $executionId, array $pendingUpdates = []): void
@@ -72,7 +76,7 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
 
     public function dispatchTimerFire(string $executionId, int $delayMs = 0): void
     {
-        $this->timers[] = ['at' => microtime(true) + (float) $delayMs / 1000.0, 'message' => new FireWorkflowTimersMessage($executionId)];
+        $this->timers[] = ['at' => $this->now() + (float) $delayMs / 1000.0, 'message' => new FireWorkflowTimersMessage($executionId)];
         $this->drain();
     }
 
@@ -82,7 +86,10 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
             return;
         }
         $this->draining = true;
-        $deadline = microtime(true) + $this->budgetSeconds;
+        $deadline = $this->now() + $this->budgetSeconds;
+        // The budget is also a length of real time: a clock that does not move would never let
+        // `$deadline` pass.
+        $budgetEndsAt = hrtime(true) + (int) ($this->budgetSeconds * 1e9);
 
         try {
             while (true) {
@@ -105,10 +112,10 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
                 }
 
                 $next = $this->nextDueAt();
-                if (null === $next || $next > $deadline) {
+                if (null === $next || $next > $deadline || hrtime(true) >= $budgetEndsAt) {
                     return;
                 }
-                usleep((int) ceil(max(0.0, $next - microtime(true)) * 1_000_000.0));
+                usleep((int) ceil(max(0.0, $next - $this->now()) * 1_000_000.0));
             }
         } finally {
             $this->draining = false;
@@ -117,7 +124,7 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
 
     private function takeDueTimer(): ?FireWorkflowTimersMessage
     {
-        $now = microtime(true);
+        $now = $this->now();
         foreach ($this->timers as $i => $timer) {
             if ($timer['at'] <= $now) {
                 array_splice($this->timers, $i, 1);
@@ -127,6 +134,11 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
         }
 
         return null;
+    }
+
+    private function now(): float
+    {
+        return null !== $this->now ? ($this->now)() : microtime(true);
     }
 
     private function nextDueAt(): ?float
