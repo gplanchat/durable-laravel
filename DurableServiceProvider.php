@@ -382,7 +382,7 @@ final class DurableServiceProvider extends ServiceProvider
                     $app->make(WorkflowResumeDispatcher::class),
                     $app->make(WorkflowTimerDispatcher::class),
                 ),
-                now: static fn(): float => (float) $app->make('durable.clock')->now()->format('U.u'),
+                clock: $app->make('durable.clock'),
             ));
             $this->app->alias(InProcessWorkflowResumeDispatcher::class, WorkflowResumeDispatcher::class);
 

@@ -7,12 +7,14 @@ namespace Gplanchat\Durable\Laravel\Queue;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
+use Gplanchat\Durable\SystemClock;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\Transport\FireWorkflowTimersMessage;
 use Gplanchat\Durable\Transport\ResumeWorkflowMessage;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
+use Psr\Clock\ClockInterface;
 
 /**
  * The memory backend's resumes and timers, driven in the caller's process (#603).
@@ -37,13 +39,15 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
 
     private bool $draining = false;
 
+    private readonly ClockInterface $clock;
+
     /**
      * @param \Closure(): (callable(ResumeWorkflowMessage): mixed)     $resume   the resume handler, resolved late: it takes this dispatcher
      * @param \Closure(): (callable(ActivityMessage): mixed)           $activity the activity processor, resolved late for the same reason
      * @param \Closure(): (callable(FireWorkflowTimersMessage): mixed) $fire     the timer handler, likewise
-     * @param (\Closure(): float)|null                                 $now      the clock the activity transport stamps
-     *                                                                           its due times with (`durable.clock`, #617);
-     *                                                                           the wall clock by default
+     * @param ClockInterface|null                                     $clock    the clock the activity transport stamps its
+     *                                                                           due times with (`durable.clock`, #617); the
+     *                                                                           core's system clock by default
      */
     public function __construct(
         private readonly WorkflowMetadataStore $metadata,
@@ -52,8 +56,10 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
         private readonly \Closure $activity,
         private readonly \Closure $fire,
         private readonly float $budgetSeconds = 10.0,
-        private readonly ?\Closure $now = null,
-    ) {}
+        ?ClockInterface $clock = null,
+    ) {
+        $this->clock = $clock ?? new SystemClock();
+    }
 
     public function dispatchResume(string $executionId, array $pendingUpdates = []): void
     {
@@ -138,7 +144,7 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
 
     private function now(): float
     {
-        return null !== $this->now ? ($this->now)() : microtime(true);
+        return (float) $this->clock->now()->format('U.u');
     }
 
     private function nextDueAt(): ?float
