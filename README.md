@@ -49,6 +49,16 @@ On the `temporal` backend, `temporal.guzzle_client` names a container binding wh
 ships Guzzle 7.14 or newer. `null` builds a default client. Likewise `temporal.psr18_client` and
 `temporal.psr17_factory` hand a PSR-18 client to `transport=http`, the JSON gateway, instead of curl.
 
+### Starting a run
+
+`WorkflowResumeDispatcher::dispatchNewWorkflowRun()` starts a run on every backend:
+
+- on `illuminate`, it queues the first resume for `queue:work`;
+- on `temporal`, it starts the workflow on the cluster, which delivers everything after that;
+- on `memory`, it drives the run **in the caller's process**: the call returns once the run has
+  completed, or once it waits on a signal or on something due later than the ten-second drain
+  budget. The journal of this backend lives in the process, so nothing else could advance it.
+
 ### Workflows are declared, not scanned
 
 Laravel's container has no equivalent of Symfony's attribute autoconfiguration, so the `workflows`
