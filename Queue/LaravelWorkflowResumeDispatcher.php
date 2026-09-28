@@ -28,11 +28,20 @@ final class LaravelWorkflowResumeDispatcher implements WorkflowResumeDispatcher
         private readonly WorkflowMetadataStore $metadataStore,
         private readonly ?string $connection = null,
         private readonly ?string $queueName = null,
+        /** A `sync` connection runs a job inline: an announcing resume would always run before its outcome. */
+        private readonly bool $runsInline = false,
     ) {}
 
     public function dispatchResume(string $executionId, array $pendingUpdates = []): void
     {
         $this->push(new ResumeWorkflowMessage($executionId, $pendingUpdates));
+    }
+
+    public function dispatchResumeAnnouncing(string $executionId, string $activityId): void
+    {
+        if (!$this->runsInline) {
+            $this->push(new ResumeWorkflowMessage($executionId, [], $activityId));
+        }
     }
 
     /** @param array<string, mixed> $payload */

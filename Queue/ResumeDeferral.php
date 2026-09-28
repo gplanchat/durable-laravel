@@ -41,6 +41,23 @@ final class ResumeDeferral
             ));
         }
 
+        $this->putBack($job, $queue);
+    }
+
+    /**
+     * Puts back a resume that arrived before its activity's outcome (DUR050). Out of deferrals, it
+     * is dropped rather than failed: the activity worker sends another resume after the append, and
+     * the error {@see defer()} raises would blame a lock nobody holds.
+     */
+    public function deferEarly(ResumeWorkflowJob $job, QueueFactory $queue): void
+    {
+        if ($job->deferrals < $this->maxDeferrals) {
+            $this->putBack($job, $queue);
+        }
+    }
+
+    private function putBack(ResumeWorkflowJob $job, QueueFactory $queue): void
+    {
         $queue->connection($this->connection)->later(
             $this->backoffSeconds,
             new ResumeWorkflowJob($job->message, $job->deferrals + 1),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Laravel\Queue;
 
 use Gplanchat\Bridge\Illuminate\Queue\ResumeLock;
+use Gplanchat\Durable\Exception\ResumeArrivedBeforeItsOutcome;
 use Gplanchat\Durable\Handler\ResumeWorkflowHandler;
 use Gplanchat\Durable\Transport\ResumeWorkflowMessage;
 use Illuminate\Contracts\Queue\Factory as QueueFactory;
@@ -43,9 +44,16 @@ final class ResumeWorkflowJob implements ShouldQueue
         QueueFactory $queue,
         ResumeDeferral $deferral,
     ): void {
-        $replayed = $lock->tryAround($this->message->executionId, function () use ($handler): void {
-            $handler($this->message);
-        });
+        try {
+            $replayed = $lock->tryAround($this->message->executionId, function () use ($handler): void {
+                $handler($this->message);
+            });
+        } catch (ResumeArrivedBeforeItsOutcome) {
+            // Sent before the outcome it announces (DUR050): put back to wait for it, not failed.
+            $deferral->deferEarly($this, $queue);
+
+            return;
+        }
 
         if ($replayed) {
             return;

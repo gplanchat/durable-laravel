@@ -368,6 +368,7 @@ final class DurableServiceProvider extends ServiceProvider
             $app->make(WorkflowMetadataStore::class),
             $queue['connection'] ?? null,
             $queue['name'] ?? null,
+            'sync' === $this->driverOf($queue['connection'] ?? null),
         ));
     }
 
