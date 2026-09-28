@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Laravel\Queue;
 
+use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Exception\ActivityAttemptDeferred;
 use Gplanchat\Durable\Transport\ActivityMessage;
+use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Worker\ActivityMessageProcessor;
 use Illuminate\Contracts\Queue\ShouldQueue;
 
@@ -25,8 +28,15 @@ final class RunActivityJob implements ShouldQueue
         public readonly ActivityMessage $message,
     ) {}
 
-    public function handle(ActivityMessageProcessor $processor): void
+    public function handle(ActivityMessageProcessor $processor, ActivityTransportInterface $activities): void
     {
-        $processor->process($this->message);
+        try {
+            $processor->process($this->message);
+        } catch (ActivityAttemptDeferred) {
+            // Another worker holds the attempt: the same attempt goes back on the queue for later,
+            // as a fresh job, so it neither spends `tries` nor gets dropped (#590). Unbounded on
+            // purpose: the holder either journals the attempt or dies, and its claim expires.
+            $activities->enqueue($this->message->deferredBy(Duration::seconds((float) ActivityAttemptDeferred::RETRY_AFTER_SECONDS)));
+        }
     }
 }
