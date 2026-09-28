@@ -38,6 +38,7 @@ use Gplanchat\Durable\Nexus\Serving\NexusOperationRegistry;
 use Gplanchat\Durable\Observation\JournalRunHistoryReader;
 use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
 use Gplanchat\Durable\Port\ActivityHeartbeatSenderInterface;
+use Gplanchat\Durable\Port\NoActivityAttemptClaim;
 use Gplanchat\Durable\Port\NullWorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\NullWorkflowTimerDispatcher;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
@@ -464,8 +465,9 @@ final class DurableServiceProvider extends ServiceProvider
             // stricter.
             $maxActivityRetries(),
             // One worker per attempt, through the resume lock's store: the server's refusal of a
-            // second start, which a journal backend has no server to make (#590).
-            attemptClaim: $app->make(ActivityAttemptLock::class),
+            // second start, which a journal backend has no server to make (#590). A container
+            // without a cache (a bare test or script) runs one process: nothing to claim against.
+            attemptClaim: $app->bound('cache') ? $app->make(ActivityAttemptLock::class) : new NoActivityAttemptClaim(),
         ));
 
         $this->app->singleton(ResumeWorkflowHandler::class, fn($app) => new ResumeWorkflowHandler(
