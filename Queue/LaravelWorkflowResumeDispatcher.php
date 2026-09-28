@@ -38,10 +38,10 @@ final class LaravelWorkflowResumeDispatcher implements WorkflowResumeDispatcher
         $this->push(new ResumeWorkflowMessage($executionId, $pendingUpdates));
     }
 
-    public function dispatchResumeAnnouncing(string $executionId, string $activityId): void
+    public function dispatchResumeAwaiting(string $executionId, AwaitedFact $fact): void
     {
         if (!$this->runsInline) {
-            $this->push(new ResumeWorkflowMessage($executionId, [], AwaitedFact::activity($activityId)));
+            $this->push(new ResumeWorkflowMessage($executionId, [], $fact));
         }
     }
 
