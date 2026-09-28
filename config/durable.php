@@ -77,6 +77,13 @@ return [
         'psr17_factory' => null,
     ],
 
+    /*
+     * The retry ceiling for every activity, the same key as the Symfony bundle's. An activity's
+     * own `RetryLimit` can only be stricter. `0` caps nothing: an activity without a limit retries
+     * until it succeeds, which is Temporal's default.
+     */
+    'max_activity_retries' => 0,
+
     'tables' => [
         'events' => 'durable_events',
         'metadata' => 'durable_workflow_metadata',
