@@ -23,7 +23,9 @@ use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
  * runs inside another, which is the recursion the provider refuses for a `sync` queue connection.
  *
  * A delayed retry or a timer is waited for within the budget; later work, or a run waiting on a
- * signal, stays suspended until the next dispatch.
+ * signal, stays suspended until the next dispatch. The budget is fixed on purpose: this backend
+ * serves tests and local runs, not long waits. A handler that throws ends the drain; what was still
+ * queued runs on the next dispatch in the same process, whatever run that dispatch is for.
  */
 final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatcher, WorkflowTimerDispatcher
 {
