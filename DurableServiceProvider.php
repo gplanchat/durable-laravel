@@ -28,8 +28,10 @@ use Gplanchat\Durable\Activity\NullActivityHeartbeatSender;
 use Gplanchat\Durable\ActivityExecutor;
 use Gplanchat\Durable\ExecutionEngine;
 use Gplanchat\Durable\ExecutionRuntime;
+use Gplanchat\Durable\Handler\FireWorkflowTimersHandler;
 use Gplanchat\Durable\Handler\ResumeWorkflowHandler;
 use Gplanchat\Durable\Laravel\Nexus\DeclaredNexusOperations;
+use Gplanchat\Durable\Laravel\Queue\InProcessWorkflowResumeDispatcher;
 use Gplanchat\Durable\Laravel\Queue\LaravelActivityTransport;
 use Gplanchat\Durable\Laravel\Queue\LaravelWorkflowResumeDispatcher;
 use Gplanchat\Durable\Laravel\Queue\LaravelWorkflowTimerDispatcher;
@@ -40,8 +42,6 @@ use Gplanchat\Durable\Observation\JournalRunHistoryReader;
 use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
 use Gplanchat\Durable\Port\ActivityHeartbeatSenderInterface;
 use Gplanchat\Durable\Port\NoActivityAttemptClaim;
-use Gplanchat\Durable\Port\NullWorkflowResumeDispatcher;
-use Gplanchat\Durable\Port\NullWorkflowTimerDispatcher;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
 use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
@@ -55,6 +55,7 @@ use Gplanchat\Durable\Store\InMemoryWorkflowRunCatalog;
 use Gplanchat\Durable\Store\ProjectingEventStore;
 use Gplanchat\Durable\Store\ProjectingWorkflowMetadataStore;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
+use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Transport\InMemoryActivityTransport;
 use Gplanchat\Durable\Worker\ActivityMessageProcessor;
@@ -363,7 +364,21 @@ final class DurableServiceProvider extends ServiceProvider
 
         if ($backend !== 'illuminate') {
             $this->app->singleton(ActivityTransportInterface::class, fn() => new InMemoryActivityTransport());
-            $this->app->singleton(WorkflowResumeDispatcher::class, fn() => new NullWorkflowResumeDispatcher());
+            // The journal lives in this process, so the call that starts a run drives it (#603).
+            // Resolved late: the handler and the processor both take this dispatcher.
+            $this->app->singleton(InProcessWorkflowResumeDispatcher::class, fn($app) => new InProcessWorkflowResumeDispatcher(
+                $app->make(WorkflowMetadataStore::class),
+                $app->make(ActivityTransportInterface::class),
+                static fn(): ResumeWorkflowHandler => $app->make(ResumeWorkflowHandler::class),
+                static fn(): \Closure => static fn(ActivityMessage $message): ?\Throwable => $app->make(ActivityMessageProcessor::class)->process($message),
+                static fn(): FireWorkflowTimersHandler => new FireWorkflowTimersHandler(
+                    $app->make(EventStoreInterface::class),
+                    $app->make(ExecutionRuntime::class),
+                    $app->make(WorkflowResumeDispatcher::class),
+                    $app->make(WorkflowTimerDispatcher::class),
+                ),
+            ));
+            $this->app->alias(InProcessWorkflowResumeDispatcher::class, WorkflowResumeDispatcher::class);
 
             return;
         }
@@ -451,7 +466,7 @@ final class DurableServiceProvider extends ServiceProvider
                     $queue['connection'] ?? null,
                     $queue['name'] ?? null,
                 )
-                : fn() => new NullWorkflowTimerDispatcher(),
+                : fn($app) => $app->make(InProcessWorkflowResumeDispatcher::class),
         );
 
         $this->app->singleton(ExecutionRuntime::class, fn($app) => new ExecutionRuntime(
