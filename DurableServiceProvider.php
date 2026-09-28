@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Laravel;
 
+use Gplanchat\Bridge\Illuminate\Queue\ActivityAttemptLock;
 use Gplanchat\Bridge\Illuminate\Queue\ResumeLock;
 use Gplanchat\Bridge\Illuminate\Schema\DurableSchema;
 use Gplanchat\Bridge\Illuminate\Store\IlluminateChildWorkflowParentLinkStore;
@@ -454,6 +455,9 @@ final class DurableServiceProvider extends ServiceProvider
             // Unlimited attempts by default, Temporal semantics. Each activity's own policy wins
             // when it declares one.
             0,
+            // One worker per attempt, through the resume lock's store: the server's refusal of a
+            // second start, which a journal backend has no server to make (#590).
+            attemptClaim: $app->make(ActivityAttemptLock::class),
         ));
 
         $this->app->singleton(ResumeWorkflowHandler::class, fn($app) => new ResumeWorkflowHandler(
@@ -480,6 +484,10 @@ final class DurableServiceProvider extends ServiceProvider
             $app->make('cache')->store($lock['store'] ?? null)->getStore(),
             (int) ($lock['ttl'] ?? 300),
             (int) ($lock['wait'] ?? 10),
+        ));
+        $this->app->singleton(ActivityAttemptLock::class, fn($app) => new ActivityAttemptLock(
+            $app->make('cache')->store($lock['store'] ?? null)->getStore(),
+            (int) ($lock['ttl'] ?? 300),
         ));
     }
 
