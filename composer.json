@@ -13,8 +13,8 @@
     "license": "MIT",
     "type": "library",
     "require": {
-        "gplanchat/durable": "self.version",
-        "gplanchat/durable-bridge-illuminate": "self.version",
+        "gplanchat/durable": "^0.1.0-beta1",
+        "gplanchat/durable-bridge-illuminate": "^0.1.0-beta1",
         "illuminate/cache": "^11.0 || ^12.0 || ^13.0",
         "illuminate/contracts": "^11.0 || ^12.0 || ^13.0",
         "illuminate/database": "^11.0 || ^12.0 || ^13.0",
