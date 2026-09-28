@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Laravel\Queue;
 
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
+use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\Transport\ResumeWorkflowMessage;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 use Illuminate\Contracts\Queue\Factory as QueueFactory;
@@ -40,7 +41,7 @@ final class LaravelWorkflowResumeDispatcher implements WorkflowResumeDispatcher
     public function dispatchResumeAnnouncing(string $executionId, string $activityId): void
     {
         if (!$this->runsInline) {
-            $this->push(new ResumeWorkflowMessage($executionId, [], $activityId));
+            $this->push(new ResumeWorkflowMessage($executionId, [], AwaitedFact::activity($activityId)));
         }
     }
 
