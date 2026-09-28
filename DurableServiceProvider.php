@@ -408,6 +408,15 @@ final class DurableServiceProvider extends ServiceProvider
     {
         /** @var array<string, mixed> $queue */
         $queue = $config['queue'] ?? [];
+        // Read on first use, like every other binding: a bad value fails where it is used, by name.
+        $maxActivityRetries = static function () use ($config): int {
+            $value = $config['max_activity_retries'] ?? 0;
+            if (!\is_int($value) || $value < 0) {
+                throw new \InvalidArgumentException(\sprintf('durable.max_activity_retries must be an integer of 0 or more, %s given.', var_export($value, true)));
+            }
+
+            return $value;
+        };
 
         $this->app->singleton(RegistryActivityExecutor::class, fn() => new RegistryActivityExecutor());
         // The port, not only the class: `RunActivityJob` asks for an `ActivityMessageProcessor`,
@@ -433,9 +442,8 @@ final class DurableServiceProvider extends ServiceProvider
             $app->make(EventStoreInterface::class),
             $app->make(ActivityTransportInterface::class),
             $app->make(RegistryActivityExecutor::class),
-            // Attempts are unlimited by default, Temporal semantics; `distributed: true` because
-            // here the drain is not inside the process, it is `queue:work`.
-            0,
+            // `distributed: true` because here the drain is not inside the process, it is `queue:work`.
+            $maxActivityRetries(),
             null,
             true,
         ));
@@ -452,9 +460,9 @@ final class DurableServiceProvider extends ServiceProvider
             $app->make(WorkflowResumeDispatcher::class),
             // No heartbeat: that is a capability of Temporal, and nothing here serves it.
             $app->make(ActivityHeartbeatSenderInterface::class),
-            // Unlimited attempts by default, Temporal semantics. Each activity's own policy wins
-            // when it declares one.
-            0,
+            // 0, the default, caps nothing: Temporal semantics. An activity's own limit can only be
+            // stricter.
+            $maxActivityRetries(),
         ));
 
         $this->app->singleton(ResumeWorkflowHandler::class, fn($app) => new ResumeWorkflowHandler(
