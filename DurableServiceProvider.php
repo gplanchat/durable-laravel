@@ -55,6 +55,7 @@ use Gplanchat\Durable\Store\InMemoryWorkflowRunCatalog;
 use Gplanchat\Durable\Store\ProjectingEventStore;
 use Gplanchat\Durable\Store\ProjectingWorkflowMetadataStore;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
+use Gplanchat\Durable\SystemClock;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Transport\InMemoryActivityTransport;
@@ -101,6 +102,10 @@ final class DurableServiceProvider extends ServiceProvider
         // An activity may inject it (the activities page shows how). Nothing here serves heartbeats,
         // so it is the no-op, bound once so the activities and the workers share it.
         $this->app->singleton(ActivityHeartbeatSenderInterface::class, NullActivityHeartbeatSender::class);
+
+        // Laravel has no PSR-20 clock of its own: the core's system clock, which an application
+        // rebinds to read time elsewhere (#617).
+        $this->app->singletonIf('durable.clock', static fn(): SystemClock => new SystemClock());
 
         match ($backend) {
             'illuminate' => $this->bindIlluminate($config),
@@ -304,7 +309,7 @@ final class DurableServiceProvider extends ServiceProvider
         $this->app->singleton(WorkflowServiceNexusRpc::class, fn($app) => $assembly($app)->nexusRpc());
         $this->app->singleton(WorkflowClientInterface::class, fn($app) => $assembly($app)->workflowClient());
         // The journal reads through to the cluster, with an in-memory store for the current turn.
-        $this->app->singleton(EventStoreInterface::class, fn($app) => $assembly($app)->readThroughEventStore(new InMemoryEventStore()));
+        $this->app->singleton(EventStoreInterface::class, fn($app) => $assembly($app)->readThroughEventStore(new InMemoryEventStore($app->make('durable.clock'))));
 
         $this->app->singleton(WorkflowMetadataStore::class, fn() => new InMemoryWorkflowMetadataStore());
         $this->app->singleton(
@@ -328,12 +333,12 @@ final class DurableServiceProvider extends ServiceProvider
     {
         // The catalog reads the journal it is fed from, so it takes the undecorated one: the
         // decorated journal needs the catalog, and the catalog needs a journal (#458).
-        $journal = new InMemoryEventStore();
-        $this->app->singleton(InMemoryWorkflowRunCatalog::class, fn() => new InMemoryWorkflowRunCatalog($journal));
+        $this->app->singleton('durable.journal.memory', fn($app) => new InMemoryEventStore($app->make('durable.clock')));
+        $this->app->singleton(InMemoryWorkflowRunCatalog::class, fn($app) => new InMemoryWorkflowRunCatalog($app->make('durable.journal.memory'), $app->make('durable.clock')));
         $this->app->alias(InMemoryWorkflowRunCatalog::class, WorkflowRunCatalogInterface::class);
         $this->app->alias(InMemoryWorkflowRunCatalog::class, WorkflowRunPickupProjectionInterface::class);
 
-        $this->app->singleton(EventStoreInterface::class, fn($app) => new ProjectingEventStore($journal, $app->make(InMemoryWorkflowRunCatalog::class)));
+        $this->app->singleton(EventStoreInterface::class, fn($app) => new ProjectingEventStore($app->make('durable.journal.memory'), $app->make(InMemoryWorkflowRunCatalog::class)));
         $this->app->singleton(WorkflowMetadataStore::class, fn($app) => new ProjectingWorkflowMetadataStore(
             new InMemoryWorkflowMetadataStore(),
             $app->make(InMemoryWorkflowRunCatalog::class),
@@ -350,7 +355,7 @@ final class DurableServiceProvider extends ServiceProvider
     private function bindActivityTransport(string $backend, array $config): void
     {
         if ($backend === 'temporal') {
-            $this->app->singleton(ActivityTransportInterface::class, fn() => new InMemoryActivityTransport());
+            $this->app->singleton(ActivityTransportInterface::class, fn($app) => new InMemoryActivityTransport($app->make('durable.clock')));
             // A new run starts on the cluster, as with the Symfony bundle; the server delivers
             // every resume after that (#603).
             $this->app->singleton(WorkflowResumeDispatcher::class, fn($app) => new TemporalWorkflowResumeDispatcher(
@@ -363,7 +368,7 @@ final class DurableServiceProvider extends ServiceProvider
         }
 
         if ($backend !== 'illuminate') {
-            $this->app->singleton(ActivityTransportInterface::class, fn() => new InMemoryActivityTransport());
+            $this->app->singleton(ActivityTransportInterface::class, fn($app) => new InMemoryActivityTransport($app->make('durable.clock')));
             // The journal lives in this process, so the call that starts a run drives it (#603).
             // Resolved late: the handler and the processor both take this dispatcher.
             $this->app->singleton(InProcessWorkflowResumeDispatcher::class, fn($app) => new InProcessWorkflowResumeDispatcher(
@@ -475,7 +480,7 @@ final class DurableServiceProvider extends ServiceProvider
             $app->make(RegistryActivityExecutor::class),
             // `distributed: true` because here the drain is not inside the process, it is `queue:work`.
             $maxActivityRetries(),
-            null,
+            $app->make('durable.clock'),
             true,
         ));
 
@@ -498,6 +503,7 @@ final class DurableServiceProvider extends ServiceProvider
             // second start, which a journal backend has no server to make (#590). A container
             // without a cache (a bare test or script) runs one process: nothing to claim against.
             attemptClaim: $app->bound('cache') ? $app->make(ActivityAttemptLock::class) : new NoActivityAttemptClaim(),
+            clock: $app->make('durable.clock'),
         ));
 
         $this->app->singleton(ResumeWorkflowHandler::class, fn($app) => new ResumeWorkflowHandler(
