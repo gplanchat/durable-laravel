@@ -15,6 +15,7 @@ use Gplanchat\Bridge\Temporal\Grpc\TemporalHistoryCursor;
 use Gplanchat\Bridge\Temporal\Grpc\WorkflowServiceExecutionRpc;
 use Gplanchat\Bridge\Temporal\Grpc\WorkflowServiceNexusRpc;
 use Gplanchat\Bridge\Temporal\Http\Psr18Http;
+use Gplanchat\Bridge\Temporal\Port\TemporalWorkflowResumeDispatcher;
 use Gplanchat\Bridge\Temporal\TemporalConnection;
 use Gplanchat\Bridge\Temporal\TemporalRuntimeAssembly;
 use Gplanchat\Bridge\Temporal\Worker\TemporalActivityWorker;
@@ -347,6 +348,19 @@ final class DurableServiceProvider extends ServiceProvider
      */
     private function bindActivityTransport(string $backend, array $config): void
     {
+        if ($backend === 'temporal') {
+            $this->app->singleton(ActivityTransportInterface::class, fn() => new InMemoryActivityTransport());
+            // A new run starts on the cluster, as with the Symfony bundle; the server delivers
+            // every resume after that (#603).
+            $this->app->singleton(WorkflowResumeDispatcher::class, fn($app) => new TemporalWorkflowResumeDispatcher(
+                $app->make(WorkflowClientInterface::class),
+                $app->make(WorkflowMetadataStore::class),
+                $app->make(WorkflowDefinitionLoader::class),
+            ));
+
+            return;
+        }
+
         if ($backend !== 'illuminate') {
             $this->app->singleton(ActivityTransportInterface::class, fn() => new InMemoryActivityTransport());
             $this->app->singleton(WorkflowResumeDispatcher::class, fn() => new NullWorkflowResumeDispatcher());
