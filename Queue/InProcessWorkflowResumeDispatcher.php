@@ -5,39 +5,47 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Laravel\Queue;
 
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
+use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Transport\AwaitedFact;
+use Gplanchat\Durable\Transport\FireWorkflowTimersMessage;
 use Gplanchat\Durable\Transport\ResumeWorkflowMessage;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 
 /**
- * The memory backend's resumes, driven in the caller's process (#603).
+ * The memory backend's resumes and timers, driven in the caller's process (#603).
  *
  * The journal of this backend lives in the process, so nothing else can advance a run: the call that
- * starts it drives it. Resumes and the activities they queue drain in one loop, one at a time. A dispatch made while the loop runs is only queued: a resume never
+ * starts it drives it. Resumes, the activities they queue and the timers that fall due drain in
+ * one loop, one at a time. A dispatch made while the loop runs is only queued: a resume never
  * runs inside another, which is the recursion the provider refuses for a `sync` queue connection.
  *
- * A delayed retry is waited for within the budget; later work, or a run waiting on a signal, stays
- * suspended until the next dispatch.
+ * A delayed retry or a timer is waited for within the budget; later work, or a run waiting on a
+ * signal, stays suspended until the next dispatch.
  */
-final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatcher
+final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatcher, WorkflowTimerDispatcher
 {
     /** @var list<ResumeWorkflowMessage> */
     private array $resumes = [];
 
+    /** @var list<array{at: float, message: FireWorkflowTimersMessage}> */
+    private array $timers = [];
+
     private bool $draining = false;
 
     /**
-     * @param \Closure(): (callable(ResumeWorkflowMessage): mixed) $resume   the resume handler, resolved late: it takes this dispatcher
-     * @param \Closure(): (callable(ActivityMessage): mixed)       $activity the activity processor, resolved late for the same reason
+     * @param \Closure(): (callable(ResumeWorkflowMessage): mixed)     $resume   the resume handler, resolved late: it takes this dispatcher
+     * @param \Closure(): (callable(ActivityMessage): mixed)           $activity the activity processor, resolved late for the same reason
+     * @param \Closure(): (callable(FireWorkflowTimersMessage): mixed) $fire     the timer handler, likewise
      */
     public function __construct(
         private readonly WorkflowMetadataStore $metadata,
         private readonly ActivityTransportInterface $activities,
         private readonly \Closure $resume,
         private readonly \Closure $activity,
+        private readonly \Closure $fire,
         private readonly float $budgetSeconds = 10.0,
     ) {}
 
@@ -57,6 +65,12 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
         // A caller passing `::class` gets the alias, as on the other dispatchers (#258).
         $this->metadata->save($executionId, (new WorkflowDefinitionLoader())->aliasForTemporalInterop($workflowType), $payload);
         $this->resumes[] = new ResumeWorkflowMessage($executionId);
+        $this->drain();
+    }
+
+    public function dispatchTimerFire(string $executionId, int $delayMs = 0): void
+    {
+        $this->timers[] = ['at' => microtime(true) + (float) $delayMs / 1000.0, 'message' => new FireWorkflowTimersMessage($executionId)];
         $this->drain();
     }
 
@@ -81,7 +95,14 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
 
                     continue;
                 }
-                $next = $this->activities->nextDueAt();
+                $timer = $this->takeDueTimer();
+                if (null !== $timer) {
+                    (($this->fire)())($timer);
+
+                    continue;
+                }
+
+                $next = $this->nextDueAt();
                 if (null === $next || $next > $deadline) {
                     return;
                 }
@@ -90,5 +111,30 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
         } finally {
             $this->draining = false;
         }
+    }
+
+    private function takeDueTimer(): ?FireWorkflowTimersMessage
+    {
+        $now = microtime(true);
+        foreach ($this->timers as $i => $timer) {
+            if ($timer['at'] <= $now) {
+                array_splice($this->timers, $i, 1);
+
+                return $timer['message'];
+            }
+        }
+
+        return null;
+    }
+
+    private function nextDueAt(): ?float
+    {
+        $at = array_column($this->timers, 'at');
+        $activity = $this->activities->nextDueAt();
+        if (null !== $activity) {
+            $at[] = $activity;
+        }
+
+        return [] === $at ? null : min($at);
     }
 }
