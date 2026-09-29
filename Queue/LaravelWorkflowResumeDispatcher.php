@@ -56,7 +56,7 @@ final class LaravelWorkflowResumeDispatcher implements WorkflowResumeDispatcher
         // diagnose command all show (#258).
         $workflowType = (new WorkflowDefinitionLoader())->aliasForTemporalInterop($workflowType);
         // The metadata first: a resume arriving before it would not know what to replay.
-        $this->metadataStore->save($executionId, $workflowType, $payload);
+        $this->metadataStore->save(ExecutionId::fromString($executionId), $workflowType, $payload);
         $this->push(new ResumeWorkflowMessage($executionId));
     }
 

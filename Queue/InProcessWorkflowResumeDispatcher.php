@@ -78,7 +78,7 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
     {
         $executionId = (string) $executionId;
         // A caller passing `::class` gets the alias, as on the other dispatchers (#258).
-        $this->metadata->save($executionId, (new WorkflowDefinitionLoader())->aliasForTemporalInterop($workflowType), $payload);
+        $this->metadata->save(ExecutionId::fromString($executionId), (new WorkflowDefinitionLoader())->aliasForTemporalInterop($workflowType), $payload);
         $this->resumes[] = new ResumeWorkflowMessage($executionId);
         $this->drain();
     }
