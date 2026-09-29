@@ -46,6 +46,12 @@ return [
     'workflows' => [],
 
     /*
+     * The activity handler classes. Each serves the contract its #[AsActivityHandler] names, or
+     * else its interfaces with #[AsActivityMethod] methods; a wrong one is refused at boot.
+     */
+    'activity_handlers' => [],
+
+    /*
      * The Temporal cluster, when `backend` is "temporal".
      *
      * The DSN carries the address, the namespace and the two task queues:

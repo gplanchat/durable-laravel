@@ -30,6 +30,7 @@ use Gplanchat\Durable\ExecutionEngine;
 use Gplanchat\Durable\ExecutionRuntime;
 use Gplanchat\Durable\Handler\FireWorkflowTimersHandler;
 use Gplanchat\Durable\Handler\ResumeWorkflowHandler;
+use Gplanchat\Durable\Laravel\Activity\DeclaredActivityHandlers;
 use Gplanchat\Durable\Laravel\Nexus\DeclaredNexusOperations;
 use Gplanchat\Durable\Laravel\Queue\InProcessWorkflowResumeDispatcher;
 use Gplanchat\Durable\Laravel\Queue\LaravelActivityTransport;
@@ -455,7 +456,10 @@ final class DurableServiceProvider extends ServiceProvider
             return $value;
         };
 
-        $this->app->singleton(RegistryActivityExecutor::class, fn() => new RegistryActivityExecutor());
+        /** @var list<string> $activityHandlers */
+        $activityHandlers = $config['activity_handlers'] ?? [];
+        $declaredActivities = new DeclaredActivityHandlers($activityHandlers);
+        $this->app->singleton(RegistryActivityExecutor::class, fn($app) => $declaredActivities->registerInto(new RegistryActivityExecutor(), $app));
         // The port, not only the class: `RunActivityJob` asks for an `ActivityMessageProcessor`,
         // which asks for an `ActivityExecutor`. Without this line the container tries to
         // instantiate an interface, and the activity fails on the first attempt.
