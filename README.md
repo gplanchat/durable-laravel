@@ -41,10 +41,25 @@ php artisan vendor:publish --tag=durable-config
 ```php
 // config/durable.php
 'backend' => 'illuminate',   // or 'temporal', or 'memory'
-'connection' => null,        // the application's default
+'connection' => 'durable',   // a connection of its own, see below
 'workflows' => [App\Workflows\Onboarding::class],
 'lock' => ['store' => null, 'ttl' => 300, 'wait' => 10],
 ```
+
+```php
+// config/database.php — the journal on a connection of its own
+'connections' => [
+    // …the application's…
+    'durable' => [
+        'driver' => 'pgsql',
+        'url' => env('DURABLE_DB_URL'),
+    ],
+],
+```
+
+Give the journal a connection of its own. `null` takes the application's default one, which is
+strongly discouraged (**DUR054**): Durable's transactions then nest inside business ones. The
+shipped migrations follow `connection`, so `php artisan migrate` creates the tables there.
 
 On the `temporal` backend, `temporal.guzzle_client` names a container binding whose
 `GuzzleHttp\ClientInterface` carries gRPC when the DSN says `transport=guzzle` — Laravel already
