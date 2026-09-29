@@ -143,6 +143,39 @@ final class DurableServiceProvider extends ServiceProvider
         // in the same process. The Symfony counterpart protects itself with a
         // DispatchAfterCurrentBusStamp; here, it is the connection that must be a real queue.
         $this->refuseAQueueThatRunsInline();
+
+        $this->warnWhenTheJournalSharesTheDefaultConnection();
+    }
+
+    /**
+     * DUR054, decision 6: warned about, never refused. On the application's default connection,
+     * Durable's fencing transactions nest inside business ones, and a business rollback erases
+     * journal events. Console only: that is where workers boot, and a web request would repeat the
+     * warning on every hit.
+     */
+    private function warnWhenTheJournalSharesTheDefaultConnection(): void
+    {
+        $config = $this->durableConfig();
+        if (($config['backend'] ?? 'illuminate') !== 'illuminate' || !$this->app->bound(LoggerInterface::class)) {
+            return;
+        }
+        if (method_exists($this->app, 'runningInConsole') && !$this->app->runningInConsole()) {
+            return;
+        }
+
+        $default = $this->app->bound('config') ? ($this->app['config']['database']['default'] ?? null) : null;
+        $connection = $config['connection'] ?? null;
+        if (null !== $connection && '' !== $connection && $connection !== $default) {
+            return;
+        }
+
+        $this->app->make(LoggerInterface::class)->warning(\sprintf(
+            'Durable: the journal is on the application\'s default connection "%s". Durable\'s '
+            . 'transactions then nest inside business ones, and a business rollback erases journal '
+            . 'events. Give it a connection of its own in config/database.php and name it in '
+            . 'durable.connection (DUR054).',
+            \is_string($default) ? $default : 'default',
+        ));
     }
 
     /** @return array<string, mixed> */
