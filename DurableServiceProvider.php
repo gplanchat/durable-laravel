@@ -556,7 +556,7 @@ final class DurableServiceProvider extends ServiceProvider
     {
         /** @var array<string, mixed> $nexus */
         $nexus = $config['nexus'] ?? [];
-        /** @var array<class-string, class-string> $handlers */
+        /** @var array<array-key, class-string> $handlers */
         $handlers = $nexus['handlers'] ?? [];
         /** @var list<class-string> $workflows */
         $workflows = $config['workflows'] ?? [];

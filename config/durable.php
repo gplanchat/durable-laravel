@@ -119,6 +119,13 @@ return [
      *
      *     'handlers' => [App\Nexus\BillingHandler::class => App\Contracts\BillingService::class],
      *
+     * or the handler class alone, when it names its contract with #[AsNexusServiceHandler]:
+     *
+     *     'handlers' => [App\Nexus\BillingHandler::class],
+     *
+     * If both are given and disagree, the registry refuses. So it does for an operation nobody
+     * serves, and for a class in `workflows` that does not exist.
+     *
      * What a handler does not serve, a workflow fulfils — it then carries
      * `#[FulfilsNexusOperation]`, and it is enough for it to be in the `workflows` list above.
      *
