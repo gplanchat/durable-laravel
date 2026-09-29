@@ -71,7 +71,8 @@ attribute declares and by its FQCN.
 
 The `activity_handlers` key does the same for activities. Each class serves the contract its
 `#[AsActivityHandler]` names, or else every interface it implements whose methods carry
-`#[AsActivityMethod]`. It is resolved from the container when one of its activities runs. A class
+`#[AsActivityMethod]`. It is resolved from the container each time one of its activities runs; bind it as a singleton to
+share one instance. A class
 that does not exist, serves no activity, or lacks a method of its contract is refused at boot.
 
 The list is also the cheap answer. Measured on a thousand classes: naming them costs 0,14 ms and
