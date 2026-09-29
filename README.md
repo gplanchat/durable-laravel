@@ -23,12 +23,14 @@ Package auto-discovery registers the provider. `migrate` creates the four tables
 
 ## What it is not
 
-**A durable engine for Laravel.** That square is occupied — `durable-workflow/workflow` does
-`yield`-as-checkpoint on Laravel queues, has its own storage, needs no server, and is good at it. If
-that is what you want, take it.
+**A durable engine for Laravel.** That square is occupied — `durable-workflow/workflow` runs on
+Laravel queues with its own storage, writes workflows as straight-line methods on Fibers since 2.0,
+and can move to its own server or Cloud, with PHP, Python and Rust SDKs. It is good at it. If that
+is what you want, take it.
 
-What this package sells is the **backend choice**: the same workflow code against a Temporal cluster
-or against one SQL database, and a mixed Symfony / Sylius / Laravel estate sharing a single engine.
+What this package sells is a **different backend choice**: the same workflow code against a Temporal
+cluster (Nexus included) or against the application's own SQL connection, and a mixed Symfony /
+Sylius / Laravel estate sharing a single engine.
 
 ## Configuration
 
