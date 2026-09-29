@@ -21,8 +21,9 @@ use Illuminate\Contracts\Queue\ShouldQueue;
  * Firing is a pass (DUR053): unlocked, a duplicate firing would supersede the resume the first one
  * dispatched, find nothing left to fire, and leave the run asleep for good.
  *
- * ponytail: a taken turn puts the firing back a second later, unbounded — the lock's TTL bounds a
- * dead holder. Route it through `ResumeDeferral` if a hot timer ever needs its cap.
+ * ponytail: a taken turn puts the firing back after `durable.lock.backoff`, without the resume's
+ * `max_deferrals` cap — the lock's TTL bounds a dead holder. Count deferrals here if a hot timer
+ * ever needs that cap.
  */
 final class FireWorkflowTimersJob implements ShouldQueue
 {
@@ -30,14 +31,14 @@ final class FireWorkflowTimersJob implements ShouldQueue
         public readonly FireWorkflowTimersMessage $message,
     ) {}
 
-    public function handle(FireWorkflowTimersHandler $handler, ResumeLock $lock, WorkflowTimerDispatcher $timers): void
+    public function handle(FireWorkflowTimersHandler $handler, ResumeLock $lock, WorkflowTimerDispatcher $timers, ResumeDeferral $deferral): void
     {
         $fired = $lock->tryAround($this->message->executionId, function () use ($handler): void {
             $handler($this->message);
         });
 
         if (!$fired) {
-            $timers->dispatchTimerFire($this->message->executionId, 1000);
+            $timers->dispatchTimerFire($this->message->executionId, $deferral->backoffSeconds() * 1000);
         }
     }
 }
