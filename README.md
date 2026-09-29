@@ -43,6 +43,7 @@ php artisan vendor:publish --tag=durable-config
 'backend' => 'illuminate',   // or 'temporal', or 'memory'
 'connection' => null,        // the application's default
 'workflows' => [App\Workflows\Onboarding::class],
+'activity_handlers' => [App\Activities\OnboardingActivities::class],
 'lock' => ['store' => null, 'ttl' => 300, 'wait' => 10],
 ```
 
@@ -67,6 +68,11 @@ Laravel's container has no equivalent of Symfony's attribute autoconfiguration, 
 key names the classes. **What that does not change is the class**: one written for
 `gplanchat/durable-bundle` runs here unmodified, and resolves both by the name its `#[AsWorkflow]`
 attribute declares and by its FQCN.
+
+The `activity_handlers` key does the same for activities. Each class serves the contract its
+`#[AsActivityHandler]` names, or else every interface it implements whose methods carry
+`#[AsActivityMethod]`. It is resolved from the container when one of its activities runs. A class
+that does not exist, serves no activity, or lacks a method of its contract is refused at boot.
 
 The list is also the cheap answer. Measured on a thousand classes: naming them costs 0,14 ms and
 does not grow with the application, while a reflection scan costs 15 ms **and loads all thousand
