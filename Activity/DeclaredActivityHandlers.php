@@ -27,10 +27,28 @@ final class DeclaredActivityHandlers
         $resolver = new ActivityContractResolver();
 
         foreach ($handlers as $handler) {
+            if (!class_exists($handler)) {
+                throw new \InvalidArgumentException(\sprintf('Durable: "%s" is declared in durable.activity_handlers, but no such class exists.', $handler));
+            }
+
+            $served = 0;
             foreach (self::contractsOf($handler) as $contract) {
                 foreach ($resolver->resolveActivityMethods($contract) as $method => $activity) {
+                    if (!method_exists($handler, $method)) {
+                        throw new \InvalidArgumentException(\sprintf('Durable: %s must implement %s::%s(), the contract its #[AsActivityHandler] names.', $handler, $contract, $method));
+                    }
                     $this->table[$activity] = [$handler, $contract, $method];
+                    ++$served;
                 }
+            }
+
+            // Symfony's pass refuses the same two mistakes at compile time.
+            if (0 === $served) {
+                throw new \InvalidArgumentException(\sprintf(
+                    'Durable: %s is declared in durable.activity_handlers but serves no activity: it neither names a '
+                    . 'contract with #[AsActivityHandler] nor implements an interface with #[AsActivityMethod] methods.',
+                    $handler,
+                ));
             }
         }
     }
@@ -56,7 +74,12 @@ final class DeclaredActivityHandlers
     {
         $named = (new \ReflectionClass($handler))->getAttributes(AsActivityHandler::class);
         if ([] !== $named) {
-            return [$named[0]->newInstance()->contract];
+            $contract = $named[0]->newInstance()->contract;
+            if (!interface_exists($contract) && !class_exists($contract)) {
+                throw new \InvalidArgumentException(\sprintf('Durable: %s names "%s" in #[AsActivityHandler], which is not a loadable interface or class.', $handler, $contract));
+            }
+
+            return [$contract];
         }
 
         return array_values(class_implements($handler) ?: []);
