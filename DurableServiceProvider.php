@@ -436,7 +436,7 @@ final class DurableServiceProvider extends ServiceProvider
      *
      * `ResumeWorkflowHandler` left the Symfony bundle for the core so that a host without a bus
      * could provide it: this package therefore only has to assemble it, not to rewrite it. A timer,
-     * for its part, is a deferred resume — the queue carries the delay, like Messenger's
+     * for its part, is a deferred timer firing — the queue carries the delay, like Messenger's
      * `DelayStamp`.
      *
      * @param array<string, mixed> $config
