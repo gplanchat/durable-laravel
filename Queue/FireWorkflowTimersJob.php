@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Laravel\Queue;
 
 use Gplanchat\Bridge\Illuminate\Queue\ResumeLock;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Handler\FireWorkflowTimersHandler;
 use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
 use Gplanchat\Durable\Transport\FireWorkflowTimersMessage;
@@ -38,7 +39,7 @@ final class FireWorkflowTimersJob implements ShouldQueue
         });
 
         if (!$fired) {
-            $timers->dispatchTimerFire($this->message->executionId, $deferral->backoffSeconds() * 1000);
+            $timers->dispatchTimerFire(ExecutionId::fromString($this->message->executionId), $deferral->backoffSeconds() * 1000);
         }
     }
 }

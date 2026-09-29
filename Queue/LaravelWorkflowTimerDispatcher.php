@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Laravel\Queue;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
 use Gplanchat\Durable\Transport\FireWorkflowTimersMessage;
 use Illuminate\Contracts\Queue\Factory as QueueFactory;
@@ -25,9 +26,9 @@ final class LaravelWorkflowTimerDispatcher implements WorkflowTimerDispatcher
         private readonly ?string $queueName = null,
     ) {}
 
-    public function dispatchTimerFire(string $executionId, int $delayMs = 0): void
+    public function dispatchTimerFire(ExecutionId $executionId, int $delayMs = 0): void
     {
-        $job = new FireWorkflowTimersJob(new FireWorkflowTimersMessage($executionId));
+        $job = new FireWorkflowTimersJob(new FireWorkflowTimersMessage($executionId->toString()));
         $connection = $this->queue->connection($this->connection);
 
         if ($delayMs > 0) {
