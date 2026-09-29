@@ -81,10 +81,9 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
         $this->drain();
     }
 
-    public function dispatchTimerFire(ExecutionId|string $executionId, int $delayMs = 0): void
+    public function dispatchTimerFire(ExecutionId $executionId, int $delayMs = 0): void
     {
-        $executionId = (string) $executionId;
-        $this->timers[] = ['at' => $this->now() + (float) $delayMs / 1000.0, 'message' => new FireWorkflowTimersMessage($executionId)];
+        $this->timers[] = ['at' => $this->now() + (float) $delayMs / 1000.0, 'message' => new FireWorkflowTimersMessage($executionId->toString())];
         $this->drain();
     }
 

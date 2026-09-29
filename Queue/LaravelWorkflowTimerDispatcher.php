@@ -25,10 +25,9 @@ final class LaravelWorkflowTimerDispatcher implements WorkflowTimerDispatcher
         private readonly ?string $queueName = null,
     ) {}
 
-    public function dispatchTimerFire(ExecutionId|string $executionId, int $delayMs = 0): void
+    public function dispatchTimerFire(ExecutionId $executionId, int $delayMs = 0): void
     {
-        $executionId = (string) $executionId;
-        $job = new ResumeWorkflowJob(new ResumeWorkflowMessage($executionId));
+        $job = new ResumeWorkflowJob(new ResumeWorkflowMessage($executionId->toString()));
         $connection = $this->queue->connection($this->connection);
 
         if ($delayMs > 0) {
