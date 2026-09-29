@@ -62,24 +62,22 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
         $this->clock = $clock ?? new SystemClock();
     }
 
-    public function dispatchResume(ExecutionId|string $executionId, array $pendingUpdates = []): void
+    public function dispatchResume(ExecutionId $executionId, array $pendingUpdates = []): void
     {
-        $executionId = (string) $executionId;
-        $this->resumes[] = new ResumeWorkflowMessage($executionId, $pendingUpdates);
+        $this->resumes[] = new ResumeWorkflowMessage($executionId->toString(), $pendingUpdates);
         $this->drain();
     }
 
     /**
      * Nothing: the resume runs in this process, after the append, like a `sync` route (DUR050 §6).
      */
-    public function dispatchResumeAwaiting(ExecutionId|string $executionId, AwaitedFact $fact): void {}
+    public function dispatchResumeAwaiting(ExecutionId $executionId, AwaitedFact $fact): void {}
 
-    public function dispatchNewWorkflowRun(ExecutionId|string $executionId, string $workflowType, array $payload): void
+    public function dispatchNewWorkflowRun(ExecutionId $executionId, string $workflowType, array $payload): void
     {
-        $executionId = (string) $executionId;
         // A caller passing `::class` gets the alias, as on the other dispatchers (#258).
-        $this->metadata->save(ExecutionId::fromString($executionId), (new WorkflowDefinitionLoader())->aliasForTemporalInterop($workflowType), $payload);
-        $this->resumes[] = new ResumeWorkflowMessage($executionId);
+        $this->metadata->save($executionId, (new WorkflowDefinitionLoader())->aliasForTemporalInterop($workflowType), $payload);
+        $this->resumes[] = new ResumeWorkflowMessage($executionId->toString());
         $this->drain();
     }
 

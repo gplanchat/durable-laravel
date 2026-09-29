@@ -34,30 +34,27 @@ final class LaravelWorkflowResumeDispatcher implements WorkflowResumeDispatcher
         private readonly bool $runsInline = false,
     ) {}
 
-    public function dispatchResume(ExecutionId|string $executionId, array $pendingUpdates = []): void
+    public function dispatchResume(ExecutionId $executionId, array $pendingUpdates = []): void
     {
-        $executionId = (string) $executionId;
-        $this->push(new ResumeWorkflowMessage($executionId, $pendingUpdates));
+        $this->push(new ResumeWorkflowMessage($executionId->toString(), $pendingUpdates));
     }
 
-    public function dispatchResumeAwaiting(ExecutionId|string $executionId, AwaitedFact $fact): void
+    public function dispatchResumeAwaiting(ExecutionId $executionId, AwaitedFact $fact): void
     {
-        $executionId = (string) $executionId;
         if (!$this->runsInline) {
-            $this->push(new ResumeWorkflowMessage($executionId, [], $fact));
+            $this->push(new ResumeWorkflowMessage($executionId->toString(), [], $fact));
         }
     }
 
     /** @param array<string, mixed> $payload */
-    public function dispatchNewWorkflowRun(ExecutionId|string $executionId, string $workflowType, array $payload): void
+    public function dispatchNewWorkflowRun(ExecutionId $executionId, string $workflowType, array $payload): void
     {
-        $executionId = (string) $executionId;
         // A caller passing `::class` gets the alias: the name the journal, the dashboard and the
         // diagnose command all show (#258).
         $workflowType = (new WorkflowDefinitionLoader())->aliasForTemporalInterop($workflowType);
         // The metadata first: a resume arriving before it would not know what to replay.
-        $this->metadataStore->save(ExecutionId::fromString($executionId), $workflowType, $payload);
-        $this->push(new ResumeWorkflowMessage($executionId));
+        $this->metadataStore->save($executionId, $workflowType, $payload);
+        $this->push(new ResumeWorkflowMessage($executionId->toString()));
     }
 
     private function push(ResumeWorkflowMessage $message): void
