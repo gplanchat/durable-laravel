@@ -86,10 +86,8 @@ final class LaravelActivityTransport implements ActivityTransportInterface
     }
 
     /** Best effort, and Laravel does not allow it: a queued job cannot be removed by its content. */
-    public function removePendingFor(ExecutionId|string $executionId, string $activityId): bool
+    public function removePendingFor(ExecutionId $executionId, string $activityId): bool
     {
-        $executionId = (string) $executionId;
-
         return false;
     }
 
