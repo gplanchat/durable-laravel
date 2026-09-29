@@ -108,8 +108,8 @@ that is where the plurality of processes lives.
 
 ## Not in this package
 
-- **A Filament dashboard.** `gplanchat/durable-filament` will require this package, and this package
-  will never require, suggest or detect Filament. A Laravel application without Filament hears
+- **A Filament dashboard.** `gplanchat/durable-filament` requires this package, and this package
+  never requires, suggests or detects Filament. A Laravel application without Filament hears
   nothing about it — the same one-directional shape as `durable-plugin` against `durable-bundle`.
 The `temporal` backend used to be on this list, and it no longer is: `backend => 'temporal'` binds
 the journal and the catalogue to a cluster, `durable:temporal-worker` drains the workflow tasks,
