@@ -76,6 +76,10 @@ return [
         // stream factories — defaulting to the client's binding. null keeps curl.
         'psr18_client' => null,
         'psr17_factory' => null,
+        // A container binding: the application's PayloadCodecInterface, which encodes every
+        // payload sent to Temporal and decodes every payload read (DUR055). The codec reads its
+        // own key, from the application's .env; Durable reads none. null sends payloads as they are.
+        'payload_codec' => null,
     ],
 
     /*
