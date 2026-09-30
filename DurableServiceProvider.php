@@ -317,6 +317,8 @@ final class DurableServiceProvider extends ServiceProvider
                 \is_string($temporal['guzzle_client'] ?? null) && '' !== $temporal['guzzle_client'] ? $app->make($temporal['guzzle_client']) : null,
                 // transport=http over the application's PSR-18 client instead of curl.
                 self::psr18Http($app, $temporal),
+                // DUR055: the application's codec, which reads its own key; Durable reads none.
+                \is_string($temporal['payload_codec'] ?? null) && '' !== $temporal['payload_codec'] ? $app->make($temporal['payload_codec']) : null,
             ),
         );
         // The graph is the bridge's (#356); each binding below is one of its objects.
