@@ -24,6 +24,7 @@ use Gplanchat\Bridge\Temporal\Worker\WorkflowTaskProcessor;
 use Gplanchat\Bridge\Temporal\Worker\WorkflowTaskRunner;
 use Gplanchat\Bridge\Temporal\WorkflowClientInterface;
 use Gplanchat\Bridge\Temporal\WorkflowServiceClientFactory;
+use Gplanchat\Bridge\Temporal\WorkflowServiceClientInterface;
 use Gplanchat\Durable\Activity\NullActivityHeartbeatSender;
 use Gplanchat\Durable\ActivityExecutor;
 use Gplanchat\Durable\ExecutionEngine;
@@ -69,6 +70,7 @@ use Illuminate\Contracts\Container\Container as ContainerContract;
 use Illuminate\Contracts\Queue\Factory as QueueFactory;
 use Illuminate\Database\Connection;
 use Illuminate\Support\ServiceProvider;
+use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -105,8 +107,14 @@ final class DurableServiceProvider extends ServiceProvider
         $this->app->singleton(ActivityHeartbeatSenderInterface::class, NullActivityHeartbeatSender::class);
 
         // Laravel has no PSR-20 clock of its own: the core's system clock, which an application
-        // rebinds to read time elsewhere (#617).
-        $this->app->singletonIf('durable.clock', static fn(): SystemClock => new SystemClock());
+        // rebinds to read time elsewhere (#617). Bound by its interface (#879), with `durable.clock`
+        // as its alias; a clock the application bound under that id first stays the one both give.
+        if ($this->app->bound('durable.clock')) {
+            $this->app->singletonIf(ClockInterface::class, static fn($app) => $app->make('durable.clock'));
+        } else {
+            $this->app->singletonIf(ClockInterface::class, static fn(): SystemClock => new SystemClock());
+            $this->app->alias(ClockInterface::class, 'durable.clock');
+        }
 
         match ($backend) {
             'illuminate' => $this->bindIlluminate($config),
@@ -310,7 +318,7 @@ final class DurableServiceProvider extends ServiceProvider
         $searchAttributes = true === ($temporal['search_attributes'] ?? false);
         $this->app->singleton(TemporalConnection::class, fn() => TemporalConnection::fromDsn($dsn, $searchAttributes));
         $this->app->singleton(
-            'durable.temporal.client',
+            WorkflowServiceClientInterface::class,
             fn($app) => WorkflowServiceClientFactory::create(
                 $app->make(TemporalConnection::class),
                 $app->bound(LoggerInterface::class) ? $app->make(LoggerInterface::class) : null,
@@ -322,9 +330,11 @@ final class DurableServiceProvider extends ServiceProvider
                 \is_string($temporal['payload_codec'] ?? null) && '' !== $temporal['payload_codec'] ? $app->make($temporal['payload_codec']) : null,
             ),
         );
+        // The string id predates the class binding (#879) and stays for compatibility.
+        $this->app->alias(WorkflowServiceClientInterface::class, 'durable.temporal.client');
         // The graph is the bridge's (#356); each binding below is one of its objects.
         $this->app->singleton(TemporalRuntimeAssembly::class, fn($app) => new TemporalRuntimeAssembly(
-            $app->make('durable.temporal.client'),
+            $app->make(WorkflowServiceClientInterface::class),
             $app->make(TemporalConnection::class),
             $app->make(WorkflowRegistry::class),
             $app->make(WorkflowDefinitionLoader::class),
