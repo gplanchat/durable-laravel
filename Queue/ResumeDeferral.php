@@ -56,6 +56,12 @@ final class ResumeDeferral
         }
     }
 
+    /** How long a job whose turn is taken waits before it tries again: `durable.lock.backoff`. */
+    public function backoffSeconds(): int
+    {
+        return $this->backoffSeconds;
+    }
+
     private function putBack(ResumeWorkflowJob $job, QueueFactory $queue): void
     {
         $queue->connection($this->connection)->later(
