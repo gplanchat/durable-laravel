@@ -27,9 +27,11 @@ use Illuminate\Contracts\Container\Container;
 final class DeclaredNexusOperations
 {
     /**
-     * @param array<class-string, class-string> $handlers handler => the contract it serves
-     * @param list<class-string>                $workflows the declared workflows, where the
-     *                                                     operations they fulfil are read
+     * @param array<array-key, class-string> $handlers  handler => the contract it serves, or a
+     *                                                  handler alone, whose contract its
+     *                                                  #[AsNexusServiceHandler] names
+     * @param list<class-string>             $workflows the declared workflows, where the
+     *                                                  operations they fulfil are read
      */
     public function __construct(
         private readonly Container $container,
@@ -45,6 +47,7 @@ final class DeclaredNexusOperations
             fn(string $handlerClass): object => $this->container->make($handlerClass),
             'durable.nexus.handlers',
             'The key of durable.nexus.handlers is the handler class, the value is the contract interface it serves.',
+            'durable.workflows',
         ))->registerInto($registry);
     }
 }

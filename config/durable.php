@@ -17,16 +17,17 @@ declare(strict_types=1);
 return [
     /*
      * The storage backend. This package serves three of them, and refuses the others by name rather
-     * than failing on the first execution: "illuminate" puts the journal on the connection the
-     * application already owns, "temporal" puts it in a Temporal cluster (see below), "memory" does
+     * than failing on the first execution: "illuminate" puts the journal in a SQL database through
+     * Laravel's database layer, "temporal" puts it in a Temporal cluster (see below), "memory" does
      * not survive the process and is only there for tests.
      */
     'backend' => 'illuminate',
 
     /*
-     * The database connection, in the sense of config/database.php. `null` takes the
-     * application's default one — which is the whole point of DUR030: the journal append and the
-     * business write land in one transaction because they are the same connection.
+     * The database connection, in the sense of config/database.php. Name one of its own: `null`
+     * takes the application's default one, which works but is strongly discouraged (DUR054) —
+     * Durable's transactions then nest inside the application's, and a business rollback erases
+     * journal events.
      */
     'connection' => null,
 
@@ -111,6 +112,13 @@ return [
      * The key is the handler class, the value the contract it serves:
      *
      *     'handlers' => [App\Nexus\BillingHandler::class => App\Contracts\BillingService::class],
+     *
+     * or the handler class alone, when it names its contract with #[AsNexusServiceHandler]:
+     *
+     *     'handlers' => [App\Nexus\BillingHandler::class],
+     *
+     * If both are given and disagree, the registry refuses. So it does for an operation nobody
+     * serves, and for a class in `workflows` that does not exist.
      *
      * What a handler does not serve, a workflow fulfils — it then carries
      * `#[FulfilsNexusOperation]`, and it is enough for it to be in the `workflows` list above.

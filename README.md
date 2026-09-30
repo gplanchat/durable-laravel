@@ -41,10 +41,28 @@ php artisan vendor:publish --tag=durable-config
 ```php
 // config/durable.php
 'backend' => 'illuminate',   // or 'temporal', or 'memory'
-'connection' => null,        // the application's default
+'connection' => 'durable',   // a connection of its own, see below
 'workflows' => [App\Workflows\Onboarding::class],
 'lock' => ['store' => null, 'ttl' => 300, 'wait' => 10],
 ```
+
+```php
+// config/database.php — the journal on a connection of its own
+'connections' => [
+    // …the application's…
+    'durable' => [
+        'driver' => 'pgsql',
+        'url' => env('DURABLE_DB_URL'),
+    ],
+],
+```
+
+Give the journal a connection of its own. `null` takes the application's default one, which is
+strongly discouraged (**DUR054**): Durable's transactions then nest inside business ones. The
+shipped migrations follow `connection`, so `php artisan migrate` creates the tables there. At boot,
+in the console, a journal on the default connection is warned about in the log. Better still, point
+the `durable` connection at a database and a database user of Durable's own, so that business code
+cannot reach the journal's tables at all.
 
 On the `temporal` backend, `temporal.guzzle_client` names a container binding whose
 `GuzzleHttp\ClientInterface` carries gRPC when the DSN says `transport=guzzle` — Laravel already
@@ -81,9 +99,10 @@ heard of a `config/durable.php`.
 not a configuration, it is a fault, so the choice is a single value and a backend this package does
 not serve is refused **by name** at registration rather than at the first execution.
 
-`illuminate` puts the journal on the connection the application already owns. That is the whole
-point of **DUR030**: the journal append and the business write land in one transaction because they
-are the same connection.
+`illuminate` puts the journal in a SQL database through Laravel's database layer. Name a connection
+of its own in `connection`, not the application's default one (**DUR054**): on a shared connection,
+Durable's transactions nest inside the application's, and a business rollback erases journal
+events.
 
 ### The lock store is the one setting that can silently corrupt a run
 
