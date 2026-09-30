@@ -328,6 +328,7 @@ final class DurableServiceProvider extends ServiceProvider
             $app->make(TemporalConnection::class),
             $app->make(WorkflowRegistry::class),
             $app->make(WorkflowDefinitionLoader::class),
+            $app->bound(LoggerInterface::class) ? $app->make(LoggerInterface::class) : null,
         ));
         $assembly = static fn($app): TemporalRuntimeAssembly => $app->make(TemporalRuntimeAssembly::class);
         // One sender for the activity worker, which binds each task's token onto it, and for the
