@@ -110,13 +110,9 @@ final class DurableServiceProvider extends ServiceProvider
         // which an application rebinds to read time elsewhere (#617). Everything reads it through
         // `ClockInterface` (#879), a delegate to that id. Not shared: a shared delegate would keep
         // the first clock it resolved and miss a rebinding of `durable.clock`. An application that
-        // binds `ClockInterface` itself owns the clock, and `durable.clock` follows it.
-        if ($this->app->bound(ClockInterface::class) && !$this->app->bound('durable.clock')) {
-            $this->app->alias(ClockInterface::class, 'durable.clock');
-        } else {
-            $this->app->singletonIf('durable.clock', static fn(): SystemClock => new SystemClock());
-            $this->app->bindIf(ClockInterface::class, static fn($app) => $app->make('durable.clock'));
-        }
+        // binds `ClockInterface` itself owns the clock Durable reads.
+        $this->app->singletonIf('durable.clock', static fn(): SystemClock => new SystemClock());
+        $this->app->bindIf(ClockInterface::class, static fn($app) => $app->make('durable.clock'));
 
         match ($backend) {
             'illuminate' => $this->bindIlluminate($config),
