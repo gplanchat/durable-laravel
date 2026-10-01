@@ -19,7 +19,7 @@ use Illuminate\Contracts\Queue\Factory as QueueFactory;
  * resume is a message, a new run first records its metadata then becomes one.
  *
  * **What the Symfony counterpart gets from a `DispatchAfterCurrentBusStamp`, this one gets from the
- * queue itself** — on one condition, and that is why the provider refuses the `sync` connection at
+ * queue itself**, on one condition, and that is why the provider refuses the `sync` connection at
  * boot: on `sync`, `push()` runs the job on the spot, and a resume that dispatches another one
  * would recurse in the same process until the stack ends.
  */
