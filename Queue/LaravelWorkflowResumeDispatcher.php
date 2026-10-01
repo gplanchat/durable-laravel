@@ -53,7 +53,12 @@ final readonly class LaravelWorkflowResumeDispatcher implements WorkflowResumeDi
         // diagnose command all show (#258).
         $workflowType = (new WorkflowDefinitionLoader())->aliasForTemporalInterop($workflowType);
         // The metadata first: a resume arriving before it would not know what to replay.
-        $this->metadataStore->save($executionId, $workflowType, $payload);
+        // Insert-only (#918): a row that exists is left as it is. Rewriting it would set `completed`
+        // back to false and reopen a run that finished since the caller read it. The first send of a
+        // run finds no row, and a run without one cannot complete.
+        if (null === $this->metadataStore->get($executionId)) {
+            $this->metadataStore->save($executionId, $workflowType, $payload);
+        }
         $this->push(new ResumeWorkflowMessage($executionId->toString()));
     }
 
