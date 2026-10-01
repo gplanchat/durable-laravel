@@ -38,7 +38,7 @@ return [
      * declaration is explicit. What that does not change is the class: the one that runs on
      * `durable-bundle` runs here without a line of difference.
      *
-     * Measured (§1.4): this list costs 0,14 ms and does not grow with the application, where a
+     * Measured (§1.4): this list costs 0.14 ms and does not grow with the application, where a
      * reflection scan costs 15 ms on a thousand classes and loads them all, in every process, to
      * find five.
      *
@@ -74,7 +74,7 @@ return [
         // namespace first: a server refuses a start that names an unregistered attribute.
         'search_attributes' => false,
         // A container binding: the application's GuzzleHttp\ClientInterface, which
-        // `transport=guzzle` in the DSN then uses — its proxy, TLS options and middleware apply to
+        // `transport=guzzle` in the DSN then uses: its proxy, TLS options and middleware apply to
         // gRPC. Unused by any other transport; null builds a default client.
         'guzzle_client' => null,
         // Container bindings: the application's PSR-18 client, which `transport=http` (the JSON

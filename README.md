@@ -97,7 +97,7 @@ The `activity_handlers` key does the same for activities. Each class serves the 
 share one instance. A class
 that does not exist, serves no activity, or lacks a method of its contract is refused at boot.
 
-The list is also the cheap answer. Measured on a thousand classes: naming them costs 0,14 ms and
+The list is also the cheap answer. Measured on a thousand classes: naming them costs 0.14 ms and
 does not grow with the application, while a reflection scan costs 15 ms **and loads all thousand
 into every process** to find five. There is no `durable:cache` for the same reason — a cached
 manifest beats the list by 0,11 ms, and `config:cache` already caches the file.
