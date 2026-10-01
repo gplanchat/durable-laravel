@@ -76,11 +76,13 @@ ships Guzzle 7.14 or newer. `null` builds a default client. Likewise `temporal.p
 
 - on `illuminate`, it queues the first resume for `queue:work`;
 - on `temporal`, it starts the workflow on the cluster, which delivers everything after that;
-- on `memory`, it queues the run **in the caller's process**, and `durable:drain` drives it, in
-  the same process: `Artisan::call('durable:drain')` after the dispatch. The drain returns once the
-  run has completed, or once it waits on a signal or on something due later than the ten-second
-  budget. The journal of this backend lives in the process, so nothing else could advance it, and a
-  separate `php artisan durable:drain` drains a queue of its own, empty.
+- on `memory`, it queues the run **in the caller's process**. Drive it in the same process with
+  `app(InProcessWorkflowResumeDispatcher::class)->drain()` after the dispatch. In a console process
+  (tests, commands, queue workers), `Artisan::call('durable:drain')` does the same; the command is
+  not registered in an HTTP request. The drain returns once the run has completed, or once it waits
+  on a signal or on something due later than the ten-second budget. The journal of this backend
+  lives in the process, so nothing else could advance it, and a separate
+  `php artisan durable:drain` starts with an empty queue and drives nothing.
 
 ### Workflows are declared, not scanned
 

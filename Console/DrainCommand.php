@@ -11,7 +11,8 @@ use Illuminate\Console\Command;
  * Drives the runs this process has queued on the memory backend (#881).
  *
  * The journal of that backend lives in the process: the command drains only what the process that
- * runs it has queued. From code, `Artisan::call('durable:drain')` after `dispatchNewWorkflowRun()`.
+ * runs it has queued. The provider registers it in a console process only; from code, call
+ * `InProcessWorkflowResumeDispatcher::drain()` after `dispatchNewWorkflowRun()`.
  */
 final class DrainCommand extends Command
 {

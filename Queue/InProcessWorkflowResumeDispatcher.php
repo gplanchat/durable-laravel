@@ -20,8 +20,8 @@ use Psr\Clock\ClockInterface;
 /**
  * The memory backend's resumes and timers, driven in the caller's process (#603).
  *
- * The journal of this backend lives in the process, so nothing else can advance a run: the call that
- * starts it drives it. Resumes, the activities they queue and the timers that fall due drain in
+ * The journal of this backend lives in the process, so nothing else can advance a run: the process
+ * that starts it drains it. Resumes, the activities they queue and the timers that fall due drain in
  * one loop, one at a time. A dispatch made while the loop runs is only queued: a resume never
  * runs inside another, which is the recursion the provider refuses for a `sync` queue connection.
  *

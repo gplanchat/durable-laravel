@@ -414,7 +414,7 @@ final class DurableServiceProvider extends ServiceProvider
 
         if ($backend !== 'illuminate') {
             $this->app->singleton(ActivityTransportInterface::class, fn($app) => new InMemoryActivityTransport($app->make(ClockInterface::class)));
-            // The journal lives in this process, so the call that starts a run drives it (#603).
+            // The journal lives in this process, so the process that starts a run drains it (#603, #881).
             // Resolved late: the handler and the processor both take this dispatcher.
             $this->app->singleton(InProcessWorkflowResumeDispatcher::class, fn($app) => new InProcessWorkflowResumeDispatcher(
                 $app->make(WorkflowMetadataStore::class),
