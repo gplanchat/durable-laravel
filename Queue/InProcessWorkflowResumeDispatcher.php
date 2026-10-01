@@ -25,6 +25,10 @@ use Psr\Clock\ClockInterface;
  * one loop, one at a time. A dispatch made while the loop runs is only queued: a resume never
  * runs inside another, which is the recursion the provider refuses for a `sync` queue connection.
  *
+ * A new run is only queued, wherever it is dispatched from, and runs at the next drain: `durable:drain`,
+ * {@see drain()}, or any other dispatch. A continue-as-new thus marks the old run completed before
+ * its next run runs (#881).
+ *
  * A delayed retry or a timer is waited for within the budget; later work, or a run waiting on a
  * signal, stays suspended until the next dispatch. The budget is fixed on purpose: this backend
  * serves tests and local runs, not long waits. A handler that throws ends the drain; what was still
@@ -78,7 +82,6 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
         // A caller passing `::class` gets the alias, as on the other dispatchers (#258).
         $this->metadata->save($executionId, (new WorkflowDefinitionLoader())->aliasForTemporalInterop($workflowType), $payload);
         $this->resumes[] = new ResumeWorkflowMessage($executionId->toString());
-        $this->drain();
     }
 
     public function dispatchTimerFire(ExecutionId $executionId, int $delayMs = 0): void
@@ -87,7 +90,10 @@ final class InProcessWorkflowResumeDispatcher implements WorkflowResumeDispatche
         $this->drain();
     }
 
-    private function drain(): void
+    /**
+     * Drives what this process has queued, within the budget. A call made during a drain returns at once.
+     */
+    public function drain(): void
     {
         if ($this->draining) {
             return;

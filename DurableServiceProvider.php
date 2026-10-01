@@ -431,6 +431,11 @@ final class DurableServiceProvider extends ServiceProvider
             ));
             $this->app->alias(InProcessWorkflowResumeDispatcher::class, WorkflowResumeDispatcher::class);
 
+            if (method_exists($this->app, 'runningInConsole') && $this->app->runningInConsole()) {
+                // Named by a string, as the Temporal worker commands are: see bindTemporal().
+                $this->commands(['Gplanchat\\Durable\\Laravel\\Console\\DrainCommand']);
+            }
+
             return;
         }
 
