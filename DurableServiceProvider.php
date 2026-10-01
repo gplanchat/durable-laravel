@@ -628,6 +628,7 @@ final class DurableServiceProvider extends ServiceProvider
             $app->make(WorkflowServiceNexusRpc::class),
             $app->make(TemporalConnection::class),
             $app->make(NexusOperationRegistry::class),
+            $app->bound(LoggerInterface::class) ? $app->make(LoggerInterface::class) : null,
         ));
     }
 
