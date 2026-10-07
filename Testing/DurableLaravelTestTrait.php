@@ -74,7 +74,16 @@ trait DurableLaravelTestTrait
                     }
                 }
             } else {
-                $this->app->make(Kernel::class)->call('queue:work', ['--stop-when-empty' => true]);
+                // The queue Durable dispatches to, in the sense of config/queue.php; null takes the defaults.
+                $queue = $this->app['config']->get('durable.queue', []);
+                $arguments = ['--stop-when-empty' => true];
+                if (null !== ($queue['connection'] ?? null)) {
+                    $arguments['connection'] = $queue['connection'];
+                }
+                if (null !== ($queue['name'] ?? null)) {
+                    $arguments['--queue'] = $queue['name'];
+                }
+                $this->app->make(Kernel::class)->call('queue:work', $arguments);
             }
             if ($this->durableIsSettled($executionId)) {
                 return;
