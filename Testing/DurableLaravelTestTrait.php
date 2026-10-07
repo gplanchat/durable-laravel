@@ -68,8 +68,8 @@ trait DurableLaravelTestTrait
                     $dispatcher->drain();
                 } catch (\Throwable $e) {
                     // A failing workflow ends the drain by throwing: that is an outcome to assert on,
-                    // unless the journal does not hold it.
-                    if (!$this->durableIsSettled($executionId)) {
+                    // unless the journal does not hold this run's failure.
+                    if (!$this->durableHasFailed($executionId)) {
                         throw $e;
                     }
                 }
@@ -137,6 +137,17 @@ trait DurableLaravelTestTrait
     protected function getEventStoreService(): EventStoreInterface
     {
         return $this->app->make(EventStoreInterface::class);
+    }
+
+    private function durableHasFailed(string $executionId): bool
+    {
+        foreach ($this->getEventStoreService()->readStream(ExecutionId::fromString($executionId)) as $event) {
+            if ($event instanceof WorkflowExecutionFailed) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function durableIsSettled(string $executionId): bool
